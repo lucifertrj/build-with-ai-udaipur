@@ -9,7 +9,6 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain.schema import StrOutputParser
 
 st.set_page_config(page_title="Build with AI - RAG Chatbot", page_icon="🤖", layout="wide")
-
 st.title("🤖 Build with AI - RAG Chatbot")
 
 if "messages" not in st.session_state:
@@ -19,19 +18,14 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-api_key = st.sidebar.text_input("Enter your Google API Key", type="password")
-if api_key:
-    os.environ['GOOGLE_API_KEY'] = api_key
+api_key = st.secrets["google_api_key"]
+os.environ['GOOGLE_API_KEY'] = api_key
 
 @st.cache_resource
-def initialize_rag_pipeline(api_key):
-    if not api_key:
-        return None
-    
+def initialize_rag_pipeline():
     try:
         embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")        
         client = QdrantClient(path="./buildwithai-udaipur")
-
         vector_store = QdrantVectorStore(
             client=client,
             collection_name="rag",
@@ -50,10 +44,8 @@ def initialize_rag_pipeline(api_key):
         """
         prompt = PromptTemplate.from_template(template)
         
-
         llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
         
-
         chain = (
             {
                 "context": retriever.with_config(run_name="Docs"),
@@ -78,21 +70,18 @@ if user_query:
         st.markdown(user_query)
     
     with st.chat_message("assistant"):
-        if not api_key:
-            st.error("Please enter your Google API Key in the sidebar.")
-        else:
-            chain = initialize_rag_pipeline(api_key)
+        chain = initialize_rag_pipeline()
+        
+        if chain:
+            response = ""
+            message_placeholder = st.empty()
             
-            if chain:
-                response = ""
-                message_placeholder = st.empty()
-                
-                with st.spinner("Generating response..."):
-                    for chunk in chain.stream(user_query):
-                        response += chunk
-                        message_placeholder.markdown(response + "▌")
-                    message_placeholder.markdown(response)
-                
-                st.session_state.messages.append({"role": "assistant", "content": response})
-            else:
-                st.error("Failed to initialize RAG pipeline. Have you run inject.py first?")
+            with st.spinner("Generating response..."):
+                for chunk in chain.stream(user_query):
+                    response += chunk
+                    message_placeholder.markdown(response + "▌")
+                message_placeholder.markdown(response)
+            
+            st.session_state.messages.append({"role": "assistant", "content": response})
+        else:
+            st.error("Failed to initialize RAG pipeline. Check your secrets.toml file and vector database.")
