@@ -18,7 +18,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-api_key = st.secrets["google_api_key"]
+api_key = st.secrets["GOOGLE_API_KEY"]
 os.environ['GOOGLE_API_KEY'] = api_key
 
 @st.cache_resource
